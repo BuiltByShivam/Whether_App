@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Skyline Weather</title>
+    <link rel="preconnect" href="https://api.open-meteo.com" />
+    <link rel="preconnect" href="https://geocoding-api.open-meteo.com" />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main class="app-shell" aria-live="polite">
+      <section class="hero-panel">
+        <nav class="top-bar" aria-label="Weather controls">
+          <div>
+            <p class="eyebrow">Live Weather Desk</p>
+            <h1>Skyline Weather</h1>
+          </div>
+          <form class="search" id="searchForm">
+            <label class="sr-only" for="cityInput">Search city</label>
+            <input
+              id="cityInput"
+              name="city"
+              type="search"
+              autocomplete="off"
+              placeholder="Search city..."
+              required
+            />
+            <button type="submit" title="Search city" aria-label="Search city">
+              <span aria-hidden="true">⌕</span>
+            </button>
+            <button type="button" id="locationButton" title="Use my location" aria-label="Use my location">
+              <span aria-hidden="true">◎</span>
+            </button>
+          </form>
+        </nav>
+
+        <div class="current-grid">
+          <article class="condition-card">
+            <div class="weather-mark" id="weatherIcon" aria-hidden="true">☀</div>
+            <div>
+              <p class="place" id="placeName">Finding weather...</p>
+              <p class="condition" id="conditionText">Connecting to live data</p>
+              <p class="updated" id="updatedText">Updated when data arrives</p>
+            </div>
+          </article>
+
+          <article class="temperature-card">
+            <p class="temp" id="temperature">--°</p>
+            <div>
+              <p id="feelsLike">Feels like --°</p>
+              <p id="highLow">H --° / L --°</p>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <section class="status-strip" aria-label="Current weather details">
+        <article>
+          <span>Wind</span>
+          <strong id="windValue">--</strong>
+        </article>
+        <article>
+          <span>Humidity</span>
+          <strong id="humidityValue">--</strong>
+        </article>
+        <article>
+          <span>Pressure</span>
+          <strong id="pressureValue">--</strong>
+        </article>
+        <article>
+          <span>Visibility</span>
+          <strong id="visibilityValue">--</strong>
+        </article>
+      </section>
+
+      <section class="dashboard">
+        <article class="panel timeline-panel">
+          <div class="panel-heading">
+            <h2>Next 12 Hours</h2>
+            <span id="refreshBadge">Auto-refresh: 5 min</span>
+          </div>
+          <div class="hourly-track" id="hourlyTrack"></div>
+        </article>
+
+        <article class="panel forecast-panel">
+          <div class="panel-heading">
+            <h2>7-Day Forecast</h2>
+            <span id="timezoneText">Local time</span>
+          </div>
+          <div class="forecast-list" id="forecastList"></div>
+        </article>
+
+        <article class="panel atmosphere-panel">
+          <div class="panel-heading">
+            <h2>Atmosphere</h2>
+            <span id="liveClock">--:--</span>
+          </div>
+          <div class="gauge-grid">
+            <div class="gauge">
+              <span class="gauge-fill" id="humidityGauge"></span>
+              <p>Humidity</p>
+              <strong id="humidityGaugeText">--%</strong>
+            </div>
+            <div class="gauge">
+              <span class="gauge-fill wind" id="windGauge"></span>
+              <p>Wind</p>
+              <strong id="windGaugeText">-- km/h</strong>
+            </div>
+          </div>
+          <div class="sun-card">
+            <div>
+              <span>Sunrise</span>
+              <strong id="sunriseText">--:--</strong>
+            </div>
+            <div>
+              <span>Sunset</span>
+              <strong id="sunsetText">--:--</strong>
+            </div>
+          </div>
+        </article>
+      </section>
+    </main>
+
+    <div class="toast" id="toast" role="status"></div>
+    <script src="app.js"></script>
+  </body>
+</html>
