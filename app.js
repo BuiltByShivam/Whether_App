@@ -2,6 +2,12 @@ const state = {
   place: { name: "New Delhi", latitude: 28.6139, longitude: 77.209, country: "India" },
   timer: null,
   clock: null,
+  requestId: 0,
+  weatherController: null,
+  isLoading: false,
+  sceneRequest: 0,
+  activeScene: "a",
+  sceneCity: "",
 };
 
 const WMO = {
@@ -61,6 +67,26 @@ const els = {
   sunrise: document.querySelector("#sunriseText"),
   sunset: document.querySelector("#sunsetText"),
   toast: document.querySelector("#toast"),
+  date: document.querySelector("#localDate"),
+  windDirection: document.querySelector("#windDirection"),
+  windArrow: document.querySelector(".summary-item .summary-icon"),
+  sceneA: document.querySelector("#scenePhotoA"),
+  sceneB: document.querySelector("#scenePhotoB"),
+  sceneCredit: document.querySelector("#sceneCredit"),
+};
+
+const CITY_VIEWS = {
+  delhi: "India Gate Delhi cityscape",
+  "new delhi": "India Gate Delhi cityscape",
+  mumbai: "Marine Drive Mumbai skyline",
+  paris: "Eiffel Tower Paris skyline",
+  tokyo: "Tokyo skyline Shibuya cityscape",
+  london: "Tower Bridge London skyline",
+  "new york": "Manhattan skyline New York cityscape",
+  dubai: "Burj Khalifa Dubai skyline",
+  jaipur: "Hawa Mahal Jaipur",
+  venice: "Grand Canal Venice",
+  singapore: "Marina Bay Sands Singapore skyline",
 };
 
 function weatherInfo(code) {
@@ -98,16 +124,107 @@ function formatDay(value, timezone = state.timezone) {
 
 function startClock(timezone) {
   window.clearInterval(state.clock);
+  const clockFormatter = new Intl.DateTimeFormat("en", {
+    hour: "numeric", minute: "2-digit", second: "2-digit", timeZone: timezone,
+  });
+  const dateFormatter = new Intl.DateTimeFormat("en", {
+    weekday: "long", month: "long", day: "numeric", timeZone: timezone,
+  });
   const tick = () => {
-    els.clock.textContent = new Intl.DateTimeFormat("en", {
-      hour: "numeric",
-      minute: "2-digit",
-      second: "2-digit",
-      timeZone: timezone,
-    }).format(new Date());
+    const now = new Date();
+    els.clock.textContent = clockFormatter.format(now);
+    els.date.textContent = dateFormatter.format(now);
   };
   tick();
   state.clock = window.setInterval(tick, 1000);
+}
+
+function weatherFallbackImage(mood, isNight) {
+  const width = Math.min(1600, Math.max(900, Math.round(window.innerWidth * (window.devicePixelRatio || 1))));
+  const options = `auto=format&fit=crop&w=${width}&q=78`;
+  if (mood === "rain" || mood === "storm") return `https://images.unsplash.com/photo-1515694346937-94d85e41e6f0?${options}`;
+  if (mood === "snow") return `https://images.unsplash.com/photo-1483664852095-d6cc6870702d?${options}`;
+  if (isNight) return `https://images.unsplash.com/photo-1519608487953-e999c86e7455?${options}`;
+  return `https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?${options}`;
+}
+
+async function findCityImage(place, mood, isNight) {
+  const cityKey = `${place.name}|${place.admin || ""}`.toLowerCase();
+  if (state.sceneCity === cityKey) return;
+  const request = ++state.sceneRequest;
+  const city = place.name.trim();
+  const query = CITY_VIEWS[city.toLowerCase()] || `${city} ${place.admin || ""} city skyline landscape`;
+  let imageUrl = weatherFallbackImage(mood, isNight);
+  let creditUrl = "https://commons.wikimedia.org/";
+  let creditText = `${city.toUpperCase()} · CITY ATMOSPHERE`;
+  const controller = new AbortController();
+  const timeout = window.setTimeout(() => controller.abort(), 6500);
+  try {
+    const params = new URLSearchParams({
+      action: "query", generator: "search", gsrsearch: `${query} filetype:bitmap`,
+      gsrnamespace: "6", gsrlimit: "12", prop: "imageinfo",
+      iiprop: "url|size|extmetadata", iiurlwidth: String(Math.min(1600, Math.max(900, Math.round(window.innerWidth * (window.devicePixelRatio || 1))))), format: "json", origin: "*",
+    });
+    const response = await fetch(`https://commons.wikimedia.org/w/api.php?${params}`, { signal: controller.signal });
+    if (response.ok) {
+      const data = await response.json();
+      const pages = Object.values(data.query?.pages || {});
+      const page = pages.find((item) => {
+        const info = item.imageinfo?.[0];
+        return info?.thumburl && info.width >= 900 && info.height >= 450 && info.width / info.height > 1.25;
+      });
+      if (page && request === state.sceneRequest) {
+        const info = page.imageinfo[0];
+        imageUrl = info.thumburl;
+        creditUrl = info.descriptionurl;
+        const artist = info.extmetadata?.Artist?.value?.replace(/<[^>]*>/g, " ").replace(/&nbsp;/g, " ").trim();
+        const license = info.extmetadata?.LicenseShortName?.value;
+        creditText = [artist, license].filter(Boolean).join(" · ").slice(0, 100) || "PHOTO · WIKIMEDIA COMMONS";
+      }
+    }
+  } catch {
+    // A city image is an enhancement; the weather mood fallback remains available offline.
+  } finally {
+    window.clearTimeout(timeout);
+  }
+  if (request !== state.sceneRequest) return;
+  const next = state.activeScene === "a" ? "b" : "a";
+  const layer = next === "a" ? els.sceneA : els.sceneB;
+  const preloader = new Image();
+  let triedFallback = false;
+  const imageTimeout = window.setTimeout(() => {
+    if (request === state.sceneRequest && !triedFallback) {
+      triedFallback = true;
+      creditUrl = "https://unsplash.com/license";
+      creditText = `ATMOSPHERE · ${city.toUpperCase()} · UNSPLASH`;
+      preloader.src = weatherFallbackImage(mood, isNight);
+    }
+  }, 9000);
+  preloader.onload = () => {
+    window.clearTimeout(imageTimeout);
+    if (request !== state.sceneRequest) return;
+    layer.style.backgroundImage = `url("${imageUrl}")`;
+    layer.classList.add("active");
+    (next === "a" ? els.sceneB : els.sceneA).classList.remove("active");
+    state.activeScene = next;
+    state.sceneCity = cityKey;
+    els.sceneCredit.href = creditUrl;
+    els.sceneCredit.textContent = creditText;
+    els.sceneCredit.title = `Image for ${city}`;
+  };
+  preloader.onerror = () => {
+    if (request !== state.sceneRequest) return;
+    const fallback = weatherFallbackImage(mood, isNight);
+    if (!triedFallback && fallback !== imageUrl) {
+      triedFallback = true;
+      creditUrl = "https://unsplash.com/license";
+      creditText = `ATMOSPHERE · ${city.toUpperCase()} · UNSPLASH`;
+      preloader.src = fallback;
+      return;
+    }
+    // Keep the previous loaded image when both remote sources are unavailable.
+  };
+  preloader.src = imageUrl;
 }
 
 async function geocodeCity(query) {
@@ -133,29 +250,31 @@ async function geocodeCity(query) {
 }
 
 async function reverseGeocode(latitude, longitude) {
-  const url = new URL("https://geocoding-api.open-meteo.com/v1/reverse");
+  // Open-Meteo's Geocoding API is forward-only. Nominatim provides free OSM reverse lookup.
+  const url = new URL("https://nominatim.openstreetmap.org/reverse");
   url.search = new URLSearchParams({
-    latitude: String(latitude),
-    longitude: String(longitude),
-    count: "1",
-    language: "en",
-    format: "json",
+    lat: String(latitude), lon: String(longitude), format: "jsonv2", zoom: "10", "accept-language": "en",
   });
-  const response = await fetch(url);
-  if (!response.ok) throw new Error("Could not name this location.");
+  const response = await fetch(url, { headers: { Accept: "application/json" } });
+  if (!response.ok) throw new Error("Could not find a place name for your location. Weather can still load.");
   const data = await response.json();
-  const result = data.results?.[0];
+  const address = data.address || {};
+  const name = address.city || address.town || address.village || address.suburb || address.county || address.state || "Current location";
   return {
-    name: result?.name || "Current location",
+    name,
     latitude,
     longitude,
-    country: result?.country || "",
-    admin: result?.admin1 || "",
+    country: address.country || "",
+    admin: address.state || address.region || address.county || "",
   };
 }
 
-async function loadWeather(place = state.place) {
-  els.updated.textContent = "Refreshing live weather...";
+async function loadWeather(place = state.place, requestId = state.requestId) {
+  if (requestId !== state.requestId) return false;
+  state.weatherController?.abort();
+  const controller = new AbortController();
+  state.weatherController = controller;
+  if (!state.isLoading) els.updated.textContent = "Refreshing live weather…";
   const url = new URL("https://api.open-meteo.com/v1/forecast");
   url.search = new URLSearchParams({
     latitude: String(place.latitude),
@@ -168,12 +287,35 @@ async function loadWeather(place = state.place) {
     forecast_days: "7",
   });
 
-  const response = await fetch(url);
-  if (!response.ok) throw new Error("Weather service is not responding.");
+  let response;
+  try {
+    response = await fetch(url, { signal: controller.signal });
+  } catch (error) {
+    if (error.name === "AbortError") return false;
+    throw new Error("Weather could not load. Check your internet connection and try again.");
+  }
+  if (!response.ok) throw new Error("Weather service is temporarily unavailable. Please try again.");
   const data = await response.json();
+  if (requestId !== state.requestId) return false;
   state.place = place;
   state.timezone = data.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone;
   renderWeather(data);
+  els.city.value = place.name;
+  return true;
+}
+
+function beginSelection() {
+  state.requestId += 1;
+  state.isLoading = true;
+  document.body.classList.add("loading");
+  els.updated.textContent = "Finding your weather…";
+  return state.requestId;
+}
+
+function finishSelection(requestId) {
+  if (requestId !== state.requestId) return;
+  state.isLoading = false;
+  document.body.classList.remove("loading");
 }
 
 function renderWeather(data) {
@@ -182,7 +324,8 @@ function renderWeather(data) {
   const [condition, icon, mood] = weatherInfo(current.weather_code);
   const placeParts = [state.place.name, state.place.admin, state.place.country].filter(Boolean);
 
-  document.body.className = mood;
+  const isNight = Number(current.is_day) === 0;
+  document.body.className = `${mood}${isNight ? " night" : ""}`;
   els.place.textContent = placeParts.join(", ");
   els.condition.textContent = condition;
   els.icon.textContent = icon;
@@ -193,6 +336,11 @@ function renderWeather(data) {
     "°",
   )}`;
   els.wind.textContent = `${rounded(current.wind_speed_10m)} km/h`;
+  const directions = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"];
+  const direction = directions[Math.round(current.wind_direction_10m / 45) % 8];
+  els.windDirection.textContent = `${direction} · ${rounded(current.wind_direction_10m)}°`;
+  els.windArrow.style.transform = `rotate(${current.wind_direction_10m - 45}deg)`;
+  els.wind.setAttribute("aria-label", `Wind ${rounded(current.wind_speed_10m)} kilometers per hour, from ${direction}`);
   els.humidity.textContent = `${rounded(current.relative_humidity_2m)}%`;
   els.pressure.textContent = `${rounded(current.surface_pressure)} hPa`;
 
@@ -206,11 +354,14 @@ function renderWeather(data) {
 
   els.humidityGauge.style.height = `${Math.min(current.relative_humidity_2m, 100)}%`;
   els.windGauge.style.height = `${Math.min(current.wind_speed_10m * 2, 100)}%`;
+  document.querySelector(".gauge-line i").style.width = `${Math.min(current.relative_humidity_2m, 100)}%`;
+  document.querySelector(".wind-line i").style.width = `${Math.min(current.wind_speed_10m * 2, 100)}%`;
   els.humidityGaugeText.textContent = `${rounded(current.relative_humidity_2m)}%`;
   els.windGaugeText.textContent = `${rounded(current.wind_speed_10m)} km/h`;
 
   renderHourly(data.hourly, hourIndex);
   renderDaily(daily);
+  findCityImage(state.place, mood, isNight);
   startClock(state.timezone);
 }
 
@@ -233,7 +384,7 @@ function renderHourly(hourly, startIndex) {
     const index = startIndex + offset;
     const [condition, icon] = weatherInfo(hourly.weather_code[index]);
     return `
-      <article class="hour-card" title="${condition}">
+      <article class="hour-card${offset === 0 ? " is-now" : ""}" title="${condition}"${offset === 0 ? ' aria-current="time"' : ""}>
         <span>${offset === 0 ? "Now" : formatTime(time, state.timezone)}</span>
         <div class="icon" aria-hidden="true">${icon}</div>
         <strong>${rounded(hourly.temperature_2m[index], "°")}</strong>
@@ -269,12 +420,16 @@ async function searchCity(event) {
   event.preventDefault();
   const query = els.city.value.trim();
   if (!query) return;
+  const requestId = beginSelection();
   try {
     const place = await geocodeCity(query);
-    await loadWeather(place);
-    showToast(`Showing live weather for ${place.name}.`);
+    if (requestId !== state.requestId) return;
+    const loaded = await loadWeather(place, requestId);
+    if (loaded) showToast(`Showing live weather for ${place.name}.`);
   } catch (error) {
-    showToast(error.message);
+    if (requestId === state.requestId) showToast(error.message);
+  } finally {
+    finishSelection(requestId);
   }
 }
 
@@ -283,27 +438,54 @@ function useCurrentLocation() {
     showToast("Location is not available in this browser.");
     return;
   }
-  showToast("Requesting your location...");
+  const requestId = beginSelection();
+  els.location.disabled = true;
+  showToast("Requesting your location…");
   navigator.geolocation.getCurrentPosition(
     async (position) => {
       try {
+        if (requestId !== state.requestId) return;
         const { latitude, longitude } = position.coords;
-        const place = await reverseGeocode(latitude, longitude);
-        await loadWeather(place);
+        let place;
+        try {
+          place = await reverseGeocode(latitude, longitude);
+        } catch (error) {
+          // Reverse lookup is optional: use the actual coordinates and label accurately.
+          place = { name: "Current location", latitude, longitude, country: "", admin: "" };
+          showToast("Place name lookup failed; loading weather for your coordinates.");
+        }
+        if (requestId !== state.requestId) return;
+        const loaded = await loadWeather(place, requestId);
+        if (!loaded) return;
         showToast("Using your current location.");
       } catch (error) {
-        showToast(error.message);
+        if (requestId === state.requestId) showToast(error.message);
+      } finally {
+        finishSelection(requestId);
+        els.location.disabled = false;
       }
     },
-    () => showToast("Location permission was not granted."),
-    { enableHighAccuracy: true, timeout: 10000, maximumAge: 300000 },
+    (error) => {
+      if (requestId !== state.requestId) return;
+      const message = error.code === 1
+        ? "Location permission was denied. Allow location access in your browser settings and try again."
+        : error.code === 2
+          ? "Your location is unavailable. Check that location services are enabled and try again."
+          : "Location request timed out. Please try again when your connection or GPS is available.";
+      showToast(message);
+      els.updated.textContent = "Location not updated";
+      finishSelection(requestId);
+      els.location.disabled = false;
+    },
+    { enableHighAccuracy: false, timeout: 15000, maximumAge: 120000 },
   );
 }
 
 function scheduleRefresh() {
   window.clearInterval(state.timer);
   state.timer = window.setInterval(() => {
-    loadWeather(state.place).catch((error) => showToast(error.message));
+    if (state.isLoading) return;
+    loadWeather(state.place, state.requestId).catch((error) => showToast(error.message));
   }, 300000);
 }
 
@@ -315,4 +497,7 @@ loadWeather()
     els.city.value = state.place.name;
     scheduleRefresh();
   })
-  .catch((error) => showToast(error.message));
+  .catch((error) => {
+    els.updated.textContent = "Weather unavailable";
+    showToast(error.message);
+  });

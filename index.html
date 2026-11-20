@@ -2,127 +2,69 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Skyline Weather</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#101827" />
+    <meta name="description" content="Local weather, forecasts, and city atmosphere with Skyline Weather." />
+    <title>Skyline Weather — City Atmosphere</title>
     <link rel="preconnect" href="https://api.open-meteo.com" />
     <link rel="preconnect" href="https://geocoding-api.open-meteo.com" />
+    <link rel="preconnect" href="https://commons.wikimedia.org" />
+    <link rel="preconnect" href="https://upload.wikimedia.org" />
     <link rel="stylesheet" href="styles.css" />
   </head>
-  <body>
+  <body class="clear">
+    <div class="scene" aria-hidden="true">
+      <div class="scene-photo scene-photo-a active" id="scenePhotoA"></div>
+      <div class="scene-photo scene-photo-b" id="scenePhotoB"></div>
+    </div>
+    <div class="scene-shade" aria-hidden="true"></div>
     <main class="app-shell" aria-live="polite">
-      <section class="hero-panel">
-        <nav class="top-bar" aria-label="Weather controls">
-          <div>
-            <p class="eyebrow">Live Weather Desk</p>
-            <h1>Skyline Weather</h1>
-          </div>
-          <form class="search" id="searchForm">
-            <label class="sr-only" for="cityInput">Search city</label>
-            <input
-              id="cityInput"
-              name="city"
-              type="search"
-              autocomplete="off"
-              placeholder="Search city..."
-              required
-            />
-            <button type="submit" title="Search city" aria-label="Search city">
-              <span aria-hidden="true">⌕</span>
-            </button>
-            <button type="button" id="locationButton" title="Use my location" aria-label="Use my location">
-              <span aria-hidden="true">◎</span>
-            </button>
-          </form>
-        </nav>
+      <header class="masthead">
+        <a class="brand" href="#top" aria-label="Skyline Weather home"><span class="brand-mark" aria-hidden="true">S</span><span>SKYLINE <i>WEATHER</i></span></a>
+        <form class="search" id="searchForm" role="search">
+          <label class="sr-only" for="cityInput">Search city</label>
+          <span class="search-glyph" aria-hidden="true">⌕</span>
+          <input id="cityInput" name="city" type="search" autocomplete="off" placeholder="Find a city" required />
+          <button class="search-submit" type="submit" title="Search city" aria-label="Search city">↵</button>
+          <button class="location-button" type="button" id="locationButton" title="Use my location" aria-label="Use my location"><span aria-hidden="true">◎</span></button>
+        </form>
+      </header>
 
-        <div class="current-grid">
-          <article class="condition-card">
-            <div class="weather-mark" id="weatherIcon" aria-hidden="true">☀</div>
-            <div>
-              <p class="place" id="placeName">Finding weather...</p>
-              <p class="condition" id="conditionText">Connecting to live data</p>
-              <p class="updated" id="updatedText">Updated when data arrives</p>
-            </div>
-          </article>
+      <section class="hero" id="top" aria-label="Current conditions">
+        <div class="hero-copy">
+          <div class="hero-kicker"><span class="live-dot"></span> WEATHER, WHERE YOU ARE <span class="kicker-rule"></span><span id="timezoneText">LOCAL TIME</span></div>
+          <p class="place" id="placeName">Finding weather…</p>
+          <p class="local-date" id="localDate">Local time</p>
+          <div class="hero-condition"><span class="weather-mark" id="weatherIcon" aria-hidden="true">☀</span><span id="conditionText">Connecting to live data</span></div>
+          <div class="hero-temp-line"><p class="temp" id="temperature">--°</p><div class="temp-aside"><p id="feelsLike">Feels like --°</p><p id="highLow">H --° / L --°</p></div></div>
+          <p class="updated" id="updatedText">Weather updates automatically</p>
+        </div>
+        <aside class="scene-caption"><span>THE CITY, RIGHT NOW</span><a id="sceneCredit" href="https://commons.wikimedia.org/" target="_blank" rel="noreferrer">Discover the view ↗</a></aside>
+        <div class="hero-scroll" aria-hidden="true"><span></span> SCROLL TO EXPLORE</div>
+      </section>
 
-          <article class="temperature-card">
-            <p class="temp" id="temperature">--°</p>
-            <div>
-              <p id="feelsLike">Feels like --°</p>
-              <p id="highLow">H --° / L --°</p>
-            </div>
-          </article>
+      <section class="weather-summary" aria-label="Weather at a glance">
+        <div class="summary-title"><span>AT A GLANCE</span><span class="summary-clock" id="liveClock">--:--</span></div>
+        <div class="summary-items">
+          <article class="summary-item"><span class="summary-icon" aria-hidden="true">↗</span><div><span>Wind</span><strong id="windValue">--</strong><span class="detail-note" id="windDirection">Direction --</span></div></article>
+          <article class="summary-item"><span class="summary-icon" aria-hidden="true">◌</span><div><span>Humidity</span><strong id="humidityValue">--</strong><span class="detail-note">Relative humidity</span></div></article>
+          <article class="summary-item"><span class="summary-icon" aria-hidden="true">⌁</span><div><span>Pressure</span><strong id="pressureValue">--</strong><span class="detail-note">Surface pressure</span></div></article>
+          <article class="summary-item"><span class="summary-icon" aria-hidden="true">◉</span><div><span>Visibility</span><strong id="visibilityValue">--</strong><span class="detail-note">Viewing distance</span></div></article>
+          <article class="sun-item"><div class="sun-orbit" aria-hidden="true">☼</div><div><span>Sunrise</span><strong id="sunriseText">--:--</strong></div><i></i><div><span>Sunset</span><strong id="sunsetText">--:--</strong></div></article>
         </div>
       </section>
 
-      <section class="status-strip" aria-label="Current weather details">
-        <article>
-          <span>Wind</span>
-          <strong id="windValue">--</strong>
-        </article>
-        <article>
-          <span>Humidity</span>
-          <strong id="humidityValue">--</strong>
-        </article>
-        <article>
-          <span>Pressure</span>
-          <strong id="pressureValue">--</strong>
-        </article>
-        <article>
-          <span>Visibility</span>
-          <strong id="visibilityValue">--</strong>
-        </article>
+      <section class="forecast-section" id="forecast" aria-label="Forecast">
+        <div class="section-heading"><div><span class="section-kicker">THE DAYS AHEAD</span><h2>Forecast</h2></div><span class="section-side-note">A little closer to the weather</span></div>
+        <article class="forecast-panel timeline-panel"><div class="panel-heading"><h3>Next 12 hours</h3><span id="refreshBadge">UPDATING EVERY 5 MIN</span></div><div class="hourly-track" id="hourlyTrack" aria-label="Hourly forecast"></div></article>
+        <div class="forecast-lower">
+          <article class="forecast-panel week-panel"><div class="panel-heading"><h3>This week</h3><span>7 DAYS</span></div><div class="forecast-list" id="forecastList"></div></article>
+          <article class="forecast-panel insights-panel"><div class="panel-heading"><div><span class="section-kicker">LOCAL CONDITIONS</span><h3>Atmosphere</h3></div><span class="insight-mark" aria-hidden="true">✳</span></div><div class="insight-gauges"><div class="gauge"><span class="gauge-fill" id="humidityGauge"></span><div class="gauge-top"><span>HUMIDITY</span><strong id="humidityGaugeText">--%</strong></div><div class="gauge-line"><i></i></div><span class="gauge-foot">Air moisture</span></div><div class="gauge"><span class="gauge-fill wind" id="windGauge"></span><div class="gauge-top"><span>WIND SPEED</span><strong id="windGaugeText">-- km/h</strong></div><div class="gauge-line wind-line"><i></i></div><span class="gauge-foot">At ground level</span></div></div></article>
+        </div>
       </section>
-
-      <section class="dashboard">
-        <article class="panel timeline-panel">
-          <div class="panel-heading">
-            <h2>Next 12 Hours</h2>
-            <span id="refreshBadge">Auto-refresh: 5 min</span>
-          </div>
-          <div class="hourly-track" id="hourlyTrack"></div>
-        </article>
-
-        <article class="panel forecast-panel">
-          <div class="panel-heading">
-            <h2>7-Day Forecast</h2>
-            <span id="timezoneText">Local time</span>
-          </div>
-          <div class="forecast-list" id="forecastList"></div>
-        </article>
-
-        <article class="panel atmosphere-panel">
-          <div class="panel-heading">
-            <h2>Atmosphere</h2>
-            <span id="liveClock">--:--</span>
-          </div>
-          <div class="gauge-grid">
-            <div class="gauge">
-              <span class="gauge-fill" id="humidityGauge"></span>
-              <p>Humidity</p>
-              <strong id="humidityGaugeText">--%</strong>
-            </div>
-            <div class="gauge">
-              <span class="gauge-fill wind" id="windGauge"></span>
-              <p>Wind</p>
-              <strong id="windGaugeText">-- km/h</strong>
-            </div>
-          </div>
-          <div class="sun-card">
-            <div>
-              <span>Sunrise</span>
-              <strong id="sunriseText">--:--</strong>
-            </div>
-            <div>
-              <span>Sunset</span>
-              <strong id="sunsetText">--:--</strong>
-            </div>
-          </div>
-        </article>
-      </section>
+      <footer class="footer"><a class="brand footer-brand" href="#top"><span class="brand-mark" aria-hidden="true">S</span><span>SKYLINE <i>WEATHER</i></span></a><span>Weather by <a href="https://open-meteo.com/" target="_blank" rel="noreferrer">Open-Meteo</a> · Place names © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer">OpenStreetMap</a></span></footer>
     </main>
-
-    <div class="toast" id="toast" role="status"></div>
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
     <script src="app.js"></script>
   </body>
 </html>
